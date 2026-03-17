@@ -1,0 +1,14 @@
+[project]
+name = "marktstammdatenregister"
+version = "0.1.0"
+description = "MaStR Gesamtdatenexport → DuckDB ETL"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "duckdb>=1.1",
+    "lxml>=5.0",
+    "tqdm>=4.0",
+]
+
+[project.scripts]
+etl = "etl:main"

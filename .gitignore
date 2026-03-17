@@ -3,6 +3,15 @@ __pycache__/
 *.py[codz]
 *$py.class
 
+.DS_Store
+
+Dokumentation*Gesamtdatenexport/xsd/
+Gesamtdatenexport_20260317_25.2/
+Gesamtdatenexport_20260317_25.2.
+
+mastr.duckdb
+
+
 # C extensions
 *.so
 
@@ -205,3 +214,4 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+Gesamtdatenexport_20260317_25.2.zip
