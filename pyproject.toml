@@ -1,3 +1,7 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
 [project]
 name = "marktstammdatenregister"
 version = "0.1.0"
@@ -13,5 +17,15 @@ dependencies = [
 ]
 
 [project.scripts]
-etl = "etl:main"
-export-bess = "export_bess:main"
+etl = "marktstammdatenregister.etl:main"
+export-bess = "marktstammdatenregister.export_bess:main"
+build-static-site = "marktstammdatenregister.build_static_site:main"
+
+[tool.uv]
+package = true
+
+[tool.setuptools.package-dir]
+"" = "src"
+
+[tool.setuptools.packages.find]
+where = ["src"]

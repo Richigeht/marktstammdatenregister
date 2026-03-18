@@ -3,9 +3,7 @@ from pathlib import Path
 import duckdb
 import pandas as pd
 
-
-BASE_DIR = Path(__file__).parent
-DEFAULT_DB = BASE_DIR / "mastr.duckdb"
+from .paths import DEFAULT_DB
 
 
 BESS_QUERY = """
@@ -91,9 +89,6 @@ def load_bess_dataframe(conn: duckdb.DuckDBPyConnection) -> pd.DataFrame:
 
     df["operator_name"] = df["operator_name"].fillna("Unknown")
     df["plant_name"] = df["plant_name"].fillna("Unnamed plant")
-    df["address"] = (
-        df["street"].fillna("")
-        + " "
-        + df["house_number"].fillna("")
-    ).str.strip()
+    df["address"] = (df["street"].fillna("") + " " + df["house_number"].fillna("")).str.strip()
     return df
+

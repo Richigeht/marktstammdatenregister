@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>MaStR BESS Atlas</title>
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"
+      integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY="
+      crossorigin=""
+    />
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="layout">
+      <section class="hero">
+        <div>
+          <p class="eyebrow">Marktstammdatenregister</p>
+          <h1>Battery Storage Atlas</h1>
+          <p class="subtitle">
+            Public browser for German BESS plants exported from MaStR with approximate locations.
+          </p>
+          <p id="status-banner" class="status-banner" hidden></p>
+        </div>
+      </section>
+
+      <section class="stats" id="stats">
+        <article class="stat-card">
+          <span class="stat-label">Plants</span>
+          <strong id="plants-count">...</strong>
+        </article>
+        <article class="stat-card">
+          <span class="stat-label">Mapped</span>
+          <strong id="mapped-count">...</strong>
+        </article>
+        <article class="stat-card">
+          <span class="stat-label">Net Power</span>
+          <strong id="power-sum">...</strong>
+        </article>
+        <article class="stat-card">
+          <span class="stat-label">Capacity</span>
+          <strong id="capacity-sum">...</strong>
+        </article>
+      </section>
+
+      <section class="workspace">
+        <aside class="sidebar">
+          <div class="panel">
+            <label class="field">
+              <span>Search</span>
+              <input id="search" type="search" placeholder="Plant, operator, unit ID" />
+            </label>
+
+            <label class="field">
+              <span>Bundesland</span>
+              <select id="state-filter">
+                <option value="">All</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Status</span>
+              <select id="status-filter">
+                <option value="">All</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Battery Technology</span>
+              <select id="technology-filter">
+                <option value="">All</option>
+              </select>
+            </label>
+
+            <label class="field">
+              <span>Min Net Power (MW)</span>
+              <input id="min-power" type="number" min="0" step="0.1" value="0" />
+            </label>
+
+            <label class="field">
+              <span>Min Capacity (MWh)</span>
+              <input id="min-capacity" type="number" min="0" step="0.1" value="0" />
+            </label>
+
+            <button id="reset-filters" class="button button-full">Reset Filters</button>
+          </div>
+
+          <div class="panel">
+            <h2>Selected Plant</h2>
+            <div id="selection" class="selection empty">Click a marker or table row.</div>
+          </div>
+        </aside>
+
+        <section class="content">
+          <div class="panel map-panel">
+            <div id="map" aria-label="BESS map"></div>
+          </div>
+
+          <div class="panel table-panel">
+            <div class="table-header">
+              <h2>Plants</h2>
+              <span id="table-count"></span>
+            </div>
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Plant</th>
+                    <th>Bundesland</th>
+                    <th>Operator</th>
+                    <th>Net MW</th>
+                    <th>MWh</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="table-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      </section>
+    </main>
+
+    <script
+      src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"
+      integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo="
+      crossorigin=""
+    ></script>
+    <script src="./app.js"></script>
+  </body>
+</html>

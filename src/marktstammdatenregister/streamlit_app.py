@@ -5,7 +5,7 @@ import pandas as pd
 import pydeck as pdk
 import streamlit as st
 
-from bess_data import DEFAULT_DB, load_bess_dataframe, open_db
+from .data import DEFAULT_DB, load_bess_dataframe, open_db
 
 
 st.set_page_config(
@@ -13,6 +13,7 @@ st.set_page_config(
     page_icon="🔋",
     layout="wide",
 )
+
 
 @st.cache_resource(show_spinner=False)
 def connect_db(db_path: str):
@@ -96,9 +97,9 @@ def render_map(df: pd.DataFrame):
         st.info("No coordinates available for the current filter selection.")
         return
 
-    mapped["radius_m"] = (
-        mapped["net_power_mw"].fillna(0).clip(lower=0.1).pow(0.5) * 700
-    ).clip(lower=120, upper=4000)
+    mapped["radius_m"] = (mapped["net_power_mw"].fillna(0).clip(lower=0.1).pow(0.5) * 700).clip(
+        lower=120, upper=4000
+    )
 
     view_state = pdk.ViewState(
         latitude=float(mapped["latitude"].median()),
@@ -170,10 +171,7 @@ def render_details(df: pd.DataFrame):
         st.info("No plant details available for the current filter selection.")
         return
 
-    options = {
-        f"{row.plant_name} [{row.unit_id}]": row.unit_id
-        for row in df.head(500).itertuples()
-    }
+    options = {f"{row.plant_name} [{row.unit_id}]": row.unit_id for row in df.head(500).itertuples()}
     selected_label = st.selectbox("Plant details", list(options.keys()))
     selected = df[df["unit_id"] == options[selected_label]].iloc[0]
 
@@ -207,7 +205,7 @@ def main():
     db_file = Path(db_path).expanduser()
     if not db_file.exists():
         st.error(
-            f"Database not found at `{db_file}`. Run `uv run python3 etl.py` first or point the app to an existing DuckDB file."
+            f"Database not found at `{db_file}`. Run `uv run etl` first or point the app to an existing DuckDB file."
         )
         st.stop()
 
@@ -227,18 +225,9 @@ def main():
 
     c1, c2, c3, c4 = st.columns(4)
     c1.metric("Plants", f"{len(filtered):,}")
-    c2.metric(
-        "Mapped plants",
-        f"{filtered[['latitude', 'longitude']].dropna().shape[0]:,}",
-    )
-    c3.metric(
-        "Net power",
-        format_metric(filtered["net_power_mw"].sum(), "MW"),
-    )
-    c4.metric(
-        "Usable capacity",
-        format_metric(filtered["usable_capacity_mwh"].sum(), "MWh"),
-    )
+    c2.metric("Mapped plants", f"{filtered[['latitude', 'longitude']].dropna().shape[0]:,}")
+    c3.metric("Net power", format_metric(filtered["net_power_mw"].sum(), "MW"))
+    c4.metric("Usable capacity", format_metric(filtered["usable_capacity_mwh"].sum(), "MWh"))
 
     map_tab, table_tab, detail_tab = st.tabs(["Map", "Table", "Details"])
     with map_tab:
@@ -253,7 +242,3 @@ def main():
         )
     with detail_tab:
         render_details(filtered)
-
-
-if __name__ == "__main__":
-    main()

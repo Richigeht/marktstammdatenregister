@@ -1,32 +1,21 @@
 #!/usr/bin/env python3
 """
 MaStR Gesamtdatenexport → DuckDB ETL
-
-Usage:
-    python3 etl.py [--db mastr.duckdb] [--data-dir <path>] [--tables <name> ...]
-
-Examples:
-    python3 etl.py
-    python3 etl.py --tables EinheitenStromSpeicher Katalogwerte
-    python3 etl.py --db /tmp/mastr.duckdb --data-dir /data/Gesamtdatenexport_20260317_25.2
 """
 
 import argparse
 import sys
-from pathlib import Path
 import zipfile
-from lxml import etree
+from pathlib import Path
+
 import duckdb
 import pandas as pd
+from lxml import etree
 from tqdm import tqdm
 
-# ── Paths (relative to this script) ──────────────────────────────────────────
-SCRIPT_DIR = Path(__file__).parent
-XSD_DIR = SCRIPT_DIR / "Dokumentation MaStR Gesamtdatenexport" / "xsd"
-XSD_ZIP = SCRIPT_DIR / "Dokumentation MaStR Gesamtdatenexport" / "xsd.zip"
-DEFAULT_DB = SCRIPT_DIR / "mastr.duckdb"
+from .paths import DEFAULT_DB, PROJECT_ROOT, XSD_DIR, XSD_ZIP
 
-# Tables to import (in dependency order — lookups first)
+
 DEFAULT_TABLES = [
     "Katalogkategorien",
     "Katalogwerte",
@@ -41,7 +30,6 @@ DEFAULT_TABLES = [
 
 DEFAULT_BATCH_SIZE = 200_000
 
-# ── XSD type → DuckDB type ────────────────────────────────────────────────────
 XS_TYPE_MAP = {
     "xs:string": "VARCHAR",
     "xs:int": "INTEGER",
@@ -62,10 +50,7 @@ XS_TYPE_MAP = {
 XS_NS = {"xs": "http://www.w3.org/2001/XMLSchema"}
 
 
-# ── Schema parsing ────────────────────────────────────────────────────────────
-
 def xsd_type_to_sql(elem) -> str:
-    """Determine SQL type for an xs:element node."""
     xs_type = elem.get("type")
     if xs_type:
         return XS_TYPE_MAP.get(xs_type, "VARCHAR")
@@ -77,7 +62,6 @@ def xsd_type_to_sql(elem) -> str:
 
 
 def load_xsd_bytes(table_name: str) -> bytes | None:
-    """Load an XSD either from the extracted xsd/ directory or the bundled zip."""
     xsd_name = f"{table_name}.xsd"
     xsd_path = XSD_DIR / xsd_name
     if xsd_path.exists():
@@ -90,30 +74,19 @@ def load_xsd_bytes(table_name: str) -> bytes | None:
                 return zf.read(member)
             except KeyError:
                 return None
-
     return None
 
 
 def parse_xsd(xsd_name: str, xsd_bytes: bytes) -> tuple[str, str, list[tuple[str, str]]]:
-    """
-    Parse an XSD file and return:
-        table_name  — root element name (e.g. 'EinheitenStromSpeicher')
-        row_tag     — row element name  (e.g. 'EinheitStromSpeicher')
-        fields      — [(field_name, sql_type), ...]
-    """
     root = etree.fromstring(xsd_bytes)
-
-    # Root element = table container
     root_el = root.find("xs:element", XS_NS)
     if root_el is None:
         raise ValueError(f"No root xs:element in {xsd_name}")
     table_name = root_el.get("name")
 
-    # Row element (maxOccurs="unbounded")
     row_el = root_el.find("xs:complexType/xs:sequence/xs:element", XS_NS)
     row_tag = row_el.get("name") if row_el is not None else table_name
 
-    # Field elements — either in xs:choice or xs:sequence inside the row
     field_container = None
     if row_el is not None:
         field_container = row_el.find("xs:complexType/xs:choice", XS_NS)
@@ -133,22 +106,22 @@ def parse_xsd(xsd_name: str, xsd_bytes: bytes) -> tuple[str, str, list[tuple[str
     return table_name, row_tag, fields
 
 
-# ── Database helpers ──────────────────────────────────────────────────────────
-
 def create_table(conn: duckdb.DuckDBPyConnection, table_name: str, fields: list[tuple[str, str]]):
     col_defs = ",\n    ".join(f'"{name}" {sql_type}' for name, sql_type in fields)
     conn.execute(f'CREATE TABLE IF NOT EXISTS "{table_name}" (\n    {col_defs}\n)')
 
 
 def ensure_progress_table(conn: duckdb.DuckDBPyConnection):
-    conn.execute("""
+    conn.execute(
+        """
         CREATE TABLE IF NOT EXISTS _import_progress (
             table_name VARCHAR,
             file_name  VARCHAR,
             rows       BIGINT,
             finished_at TIMESTAMP DEFAULT current_timestamp
         )
-    """)
+        """
+    )
 
 
 def completed_files(conn: duckdb.DuckDBPyConnection, table_name: str) -> set[str]:
@@ -165,13 +138,7 @@ def mark_complete(conn: duckdb.DuckDBPyConnection, table_name: str, file_name: s
     )
 
 
-# ── XML streaming ─────────────────────────────────────────────────────────────
-
 def iter_records(xml_path: Path, row_tag: str, field_names: list[str]):
-    """
-    Stream-parse a (potentially UTF-16) XML file and yield one tuple per row.
-    Tuple values are in the same order as field_names, missing fields → None.
-    """
     field_index = {name: idx for idx, name in enumerate(field_names)}
     with open(xml_path, "rb") as f:
         context = etree.iterparse(f, events=("end",), tag=row_tag, huge_tree=True)
@@ -186,8 +153,6 @@ def iter_records(xml_path: Path, row_tag: str, field_names: list[str]):
             while elem.getprevious() is not None:
                 del elem.getparent()[0]
 
-
-# ── Import ────────────────────────────────────────────────────────────────────
 
 def import_table(
     conn: duckdb.DuckDBPyConnection,
@@ -207,8 +172,8 @@ def import_table(
 
     done = completed_files(conn, table_name)
     field_names = [name for name, _ in fields]
-
     total_rows = 0
+
     for xml_path in xml_files:
         if xml_path.name in done:
             print(f"  {xml_path.name}: already imported, skipping")
@@ -222,12 +187,7 @@ def import_table(
         file_rows = 0
         conn.execute("BEGIN")
         try:
-            with tqdm(
-                desc=f"  {xml_path.name}",
-                unit=" rows",
-                unit_scale=True,
-                leave=False,
-            ) as pbar:
+            with tqdm(desc=f"  {xml_path.name}", unit=" rows", unit_scale=True, leave=False) as pbar:
                 for row in iter_records(xml_path, row_tag, field_names):
                     batch.append(row)
                     file_rows += 1
@@ -243,7 +203,6 @@ def import_table(
             conn.execute("COMMIT")
             print(f"  {xml_path.name}: {file_rows:,} rows")
             total_rows += file_rows
-
         except KeyboardInterrupt:
             conn.execute("ROLLBACK")
             print(f"\n  Interrupted during {xml_path.name} — rolled back, progress saved.")
@@ -255,13 +214,8 @@ def import_table(
     return total_rows
 
 
-# ── Main ──────────────────────────────────────────────────────────────────────
-
 def find_data_dir(base: Path) -> Path:
-    candidates = sorted(
-        [p for p in base.glob("Gesamtdatenexport_*") if p.is_dir()],
-        reverse=True,
-    )
+    candidates = sorted([p for p in base.glob("Gesamtdatenexport_*") if p.is_dir()], reverse=True)
     if not candidates:
         sys.exit("Error: no Gesamtdatenexport_* directory found. Use --data-dir.")
     return candidates[0]
@@ -281,7 +235,7 @@ def main():
     )
     args = parser.parse_args()
 
-    data_dir = args.data_dir or find_data_dir(SCRIPT_DIR)
+    data_dir = args.data_dir or find_data_dir(PROJECT_ROOT)
     tables = args.tables or DEFAULT_TABLES
 
     print(f"Data dir : {data_dir}")
@@ -290,7 +244,6 @@ def main():
     print(f"Batch    : {args.batch_size:,}")
     print()
 
-    # Parse XSD schemas
     schemas: dict[str, tuple[str, list[tuple[str, str]]]] = {}
     for table_name in tables:
         xsd_bytes = load_xsd_bytes(table_name)
@@ -303,22 +256,17 @@ def main():
 
     print()
 
-    # Open database
     conn = duckdb.connect(str(args.db))
     conn.execute("PRAGMA threads = 4")
     ensure_progress_table(conn)
 
-    # Create / reset tables
-    for table_name, (row_tag, fields) in schemas.items():
+    for table_name, (_row_tag, fields) in schemas.items():
         if args.drop:
             conn.execute(f'DROP TABLE IF EXISTS "{table_name}"')
-            conn.execute(
-                "DELETE FROM _import_progress WHERE table_name = ?", [table_name]
-            )
+            conn.execute("DELETE FROM _import_progress WHERE table_name = ?", [table_name])
         create_table(conn, table_name, fields)
     print(f"Tables ready in {args.db}\n")
 
-    # Import data
     grand_total = 0
     try:
         for table_name, (row_tag, fields) in schemas.items():
@@ -327,12 +275,9 @@ def main():
             print(f"  → {n:,} rows total\n")
             grand_total += n
     except KeyboardInterrupt:
-        print(f"\nStopped. Re-run to resume — completed files will be skipped.")
+        print("\nStopped. Re-run to resume — completed files will be skipped.")
     finally:
         conn.close()
 
     print(f"Done. {grand_total:,} rows imported into {args.db}")
 
-
-if __name__ == "__main__":
-    main()

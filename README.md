@@ -2,6 +2,13 @@
 
 Imports the German energy asset registry ([MaStR](https://www.marktstammdatenregister.de)) bulk export into a local [DuckDB](https://duckdb.org) database for fast SQL analysis.
 
+## Repository layout
+
+- `src/marktstammdatenregister/` — Python package for ETL, export, and app logic
+- `site/` — source files for the static browser
+- `docs/` — published static site for GitHub Pages and the container image
+- `docs/data/` — exported static data artifacts consumed by the browser
+
 ## What's in the database
 
 | Table | Description |
@@ -41,7 +48,7 @@ uv sync
 ## Import data
 
 ```bash
-uv run python3 etl.py
+uv run etl
 ```
 
 This reads all XSD schemas, creates the DuckDB tables, and streams the XML files into `mastr.duckdb`.
@@ -50,17 +57,17 @@ The importer reads schemas from either the extracted `xsd/` folder or the bundle
 
 **Resume after interruption** — already-completed files are tracked in `_import_progress` and skipped automatically:
 ```bash
-uv run python3 etl.py   # safe to re-run
+uv run etl   # safe to re-run
 ```
 
 **Import specific tables only:**
 ```bash
-uv run python3 etl.py --tables EinheitenStromSpeicher AnlagenEegSpeicher
+uv run etl --tables EinheitenStromSpeicher AnlagenEegSpeicher
 ```
 
 **Re-import from scratch (drop + recreate):**
 ```bash
-uv run python3 etl.py --drop
+uv run etl --drop
 ```
 
 **Check import progress:**
@@ -76,7 +83,7 @@ ORDER BY table_name;
 ### Browse BESS plants in Streamlit
 
 ```bash
-uv run streamlit run app.py
+uv run streamlit run src/marktstammdatenregister/streamlit_app.py
 ```
 
 The app opens the generated `mastr.duckdb`, lets you filter storage plants by state, status, battery technology, power, and capacity, and shows matching assets on a map using the MaStR latitude/longitude fields.
@@ -92,16 +99,14 @@ If your DuckDB is stored elsewhere, change the path in the sidebar after the app
 ### Export compact static data
 
 ```bash
-uv run python3 export_bess.py
-# or
 uv run export-bess
 ```
 
-This writes compact BESS artifacts into `dist/`:
-- `dist/bess.parquet` for efficient downstream processing
-- `dist/bess.geojson` for static map frontends
-- `dist/bess.json` for generic browser/API-style consumption
-- `dist/summary.json` with high-level totals
+By default this now writes a public-safe payload directly into `docs/data/`:
+- `docs/data/bess.geojson` with mapped plants only and rounded coordinates
+- `docs/data/summary.json` with total and public summary counts
+
+That default is intended for GitHub Pages, static hosting, and the container.
 
 You can override input and output paths:
 
@@ -109,7 +114,66 @@ You can override input and output paths:
 uv run export-bess --db /path/to/mastr.duckdb --out-dir public/data
 ```
 
-For a static website, run ETL and export in a build step somewhere else, then publish only the `dist/` artifacts plus your frontend.
+If you want exact mapped coordinates for internal use:
+
+```bash
+uv run export-bess --profile internal
+```
+
+This writes `bess.geojson`, `bess.json`, and `summary.json` with exact mapped coordinates.
+
+If you explicitly want the heavy full export again:
+
+```bash
+uv run export-bess --profile full --format parquet json geojson
+```
+
+For a static website, run ETL and export in a build step somewhere else, then publish only `docs/` including `docs/data/`.
+
+### Static site for GitHub Pages
+
+The repo includes a static frontend source in [site/index.html](/Users/kissinger/VSCode/marktstammdatenregister/site/index.html). The published output lives in [docs/index.html](/Users/kissinger/VSCode/marktstammdatenregister/docs/index.html) and reads exported data from `docs/data/`.
+
+Build the static payload like this:
+
+```bash
+uv run etl
+uv run export-bess --out-dir docs/data
+uv run build-static-site
+```
+
+Then preview locally:
+
+```bash
+python3 -m http.server 8000 -d docs
+```
+
+Open `http://localhost:8000`.
+
+To host on GitHub Pages:
+- commit `site/`, `docs/`, and `docs/data/`
+- enable GitHub Pages in repo settings
+- the included workflow [pages.yml](/Users/kissinger/VSCode/marktstammdatenregister/.github/workflows/pages.yml) deploys the contents of `docs/` on pushes to `main`
+
+This route does not need Streamlit, DuckDB, or Python on the host. The data is precomputed during export, and the browser filters the GeoJSON client-side.
+The public static site uses approximate coordinates by default to avoid republishing exact points in a clean bulk form.
+
+### Run the static browser in a container
+
+Once `docs/` and `docs/data/` are populated, build and run the container:
+
+```bash
+docker build -t mastr-bess-static .
+docker run --rm -p 8080:80 mastr-bess-static
+```
+
+Then open `http://localhost:8080`.
+
+The container serves the static `docs/` output with Nginx. It does not run ETL or DuckDB inside the container. The intended flow is:
+1. run `uv run etl`
+2. run `uv run export-bess --out-dir docs/data`
+3. run `uv run build-static-site`
+4. build the container or deploy `docs/` to GitHub Pages
 
 ### Open the UI
 
