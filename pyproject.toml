@@ -7,8 +7,11 @@ requires-python = ">=3.12"
 dependencies = [
     "duckdb>=1.1",
     "lxml>=5.0",
+    "pandas>=2.2",
+    "streamlit>=1.44",
     "tqdm>=4.0",
 ]
 
 [project.scripts]
 etl = "etl:main"
+export-bess = "export_bess:main"

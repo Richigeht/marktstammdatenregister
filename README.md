@@ -46,6 +46,7 @@ uv run python3 etl.py
 
 This reads all XSD schemas, creates the DuckDB tables, and streams the XML files into `mastr.duckdb`.
 Large tables (e.g. `EinheitenStromSpeicher`) take a few minutes.
+The importer reads schemas from either the extracted `xsd/` folder or the bundled `xsd.zip`.
 
 **Resume after interruption** — already-completed files are tracked in `_import_progress` and skipped automatically:
 ```bash
@@ -71,6 +72,44 @@ ORDER BY table_name;
 ```
 
 ## Querying the database
+
+### Browse BESS plants in Streamlit
+
+```bash
+uv run streamlit run app.py
+```
+
+The app opens the generated `mastr.duckdb`, lets you filter storage plants by state, status, battery technology, power, and capacity, and shows matching assets on a map using the MaStR latitude/longitude fields.
+
+Features:
+- map view of BESS plants with size-scaled markers
+- browsable table with export to CSV
+- detail view for a selected plant with operator, status, power, capacity, and address fields
+- works against any MaStR DuckDB path you provide in the sidebar
+
+If your DuckDB is stored elsewhere, change the path in the sidebar after the app starts.
+
+### Export compact static data
+
+```bash
+uv run python3 export_bess.py
+# or
+uv run export-bess
+```
+
+This writes compact BESS artifacts into `dist/`:
+- `dist/bess.parquet` for efficient downstream processing
+- `dist/bess.geojson` for static map frontends
+- `dist/bess.json` for generic browser/API-style consumption
+- `dist/summary.json` with high-level totals
+
+You can override input and output paths:
+
+```bash
+uv run export-bess --db /path/to/mastr.duckdb --out-dir public/data
+```
+
+For a static website, run ETL and export in a build step somewhere else, then publish only the `dist/` artifacts plus your frontend.
 
 ### Open the UI
 

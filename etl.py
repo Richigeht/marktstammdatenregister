@@ -14,13 +14,16 @@ Examples:
 import argparse
 import sys
 from pathlib import Path
+import zipfile
 from lxml import etree
 import duckdb
+import pandas as pd
 from tqdm import tqdm
 
 # ── Paths (relative to this script) ──────────────────────────────────────────
 SCRIPT_DIR = Path(__file__).parent
 XSD_DIR = SCRIPT_DIR / "Dokumentation MaStR Gesamtdatenexport" / "xsd"
+XSD_ZIP = SCRIPT_DIR / "Dokumentation MaStR Gesamtdatenexport" / "xsd.zip"
 DEFAULT_DB = SCRIPT_DIR / "mastr.duckdb"
 
 # Tables to import (in dependency order — lookups first)
@@ -36,7 +39,7 @@ DEFAULT_TABLES = [
     "EinheitenAenderungNetzbetreiberzuordnungen",
 ]
 
-BATCH_SIZE = 50_000
+DEFAULT_BATCH_SIZE = 200_000
 
 # ── XSD type → DuckDB type ────────────────────────────────────────────────────
 XS_TYPE_MAP = {
@@ -73,20 +76,37 @@ def xsd_type_to_sql(elem) -> str:
     return "VARCHAR"
 
 
-def parse_xsd(xsd_path: Path) -> tuple[str, str, list[tuple[str, str]]]:
+def load_xsd_bytes(table_name: str) -> bytes | None:
+    """Load an XSD either from the extracted xsd/ directory or the bundled zip."""
+    xsd_name = f"{table_name}.xsd"
+    xsd_path = XSD_DIR / xsd_name
+    if xsd_path.exists():
+        return xsd_path.read_bytes()
+
+    if XSD_ZIP.exists():
+        member = f"xsd/{xsd_name}"
+        with zipfile.ZipFile(XSD_ZIP) as zf:
+            try:
+                return zf.read(member)
+            except KeyError:
+                return None
+
+    return None
+
+
+def parse_xsd(xsd_name: str, xsd_bytes: bytes) -> tuple[str, str, list[tuple[str, str]]]:
     """
     Parse an XSD file and return:
         table_name  — root element name (e.g. 'EinheitenStromSpeicher')
         row_tag     — row element name  (e.g. 'EinheitStromSpeicher')
         fields      — [(field_name, sql_type), ...]
     """
-    tree = etree.parse(str(xsd_path))
-    root = tree.getroot()
+    root = etree.fromstring(xsd_bytes)
 
     # Root element = table container
     root_el = root.find("xs:element", XS_NS)
     if root_el is None:
-        raise ValueError(f"No root xs:element in {xsd_path}")
+        raise ValueError(f"No root xs:element in {xsd_name}")
     table_name = root_el.get("name")
 
     # Row element (maxOccurs="unbounded")
@@ -152,11 +172,19 @@ def iter_records(xml_path: Path, row_tag: str, field_names: list[str]):
     Stream-parse a (potentially UTF-16) XML file and yield one tuple per row.
     Tuple values are in the same order as field_names, missing fields → None.
     """
+    field_index = {name: idx for idx, name in enumerate(field_names)}
     with open(xml_path, "rb") as f:
-        for _event, elem in etree.iterparse(f, events=("end",), tag=row_tag):
-            record = {child.tag: child.text for child in elem}
-            yield tuple(record.get(name) for name in field_names)
+        context = etree.iterparse(f, events=("end",), tag=row_tag, huge_tree=True)
+        for _event, elem in context:
+            record = [None] * len(field_names)
+            for child in elem:
+                idx = field_index.get(child.tag)
+                if idx is not None:
+                    record[idx] = child.text
+            yield tuple(record)
             elem.clear()
+            while elem.getprevious() is not None:
+                del elem.getparent()[0]
 
 
 # ── Import ────────────────────────────────────────────────────────────────────
@@ -167,6 +195,7 @@ def import_table(
     row_tag: str,
     fields: list[tuple[str, str]],
     data_dir: Path,
+    batch_size: int,
 ) -> int:
     xml_files = sorted(data_dir.glob(f"{table_name}.xml")) + sorted(
         data_dir.glob(f"{table_name}_*.xml"),
@@ -178,9 +207,6 @@ def import_table(
 
     done = completed_files(conn, table_name)
     field_names = [name for name, _ in fields]
-    placeholders = ", ".join(["?"] * len(fields))
-    quoted_cols = ", ".join(f'"{n}"' for n in field_names)
-    insert_sql = f'INSERT INTO "{table_name}" ({quoted_cols}) VALUES ({placeholders})'
 
     total_rows = 0
     for xml_path in xml_files:
@@ -205,12 +231,12 @@ def import_table(
                 for row in iter_records(xml_path, row_tag, field_names):
                     batch.append(row)
                     file_rows += 1
-                    if len(batch) >= BATCH_SIZE:
-                        conn.executemany(insert_sql, batch)
+                    if len(batch) >= batch_size:
+                        conn.append(table_name, pd.DataFrame.from_records(batch, columns=field_names))
                         pbar.update(len(batch))
                         batch = []
                 if batch:
-                    conn.executemany(insert_sql, batch)
+                    conn.append(table_name, pd.DataFrame.from_records(batch, columns=field_names))
                     pbar.update(len(batch))
 
             mark_complete(conn, table_name, xml_path.name, file_rows)
@@ -247,6 +273,12 @@ def main():
     parser.add_argument("--data-dir", type=Path, help="Directory with XML files (auto-detected if omitted)")
     parser.add_argument("--tables", nargs="+", metavar="TABLE", help="Only import these tables")
     parser.add_argument("--drop", action="store_true", help="Drop existing tables before import")
+    parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=DEFAULT_BATCH_SIZE,
+        help=f"Rows per append batch (default: {DEFAULT_BATCH_SIZE})",
+    )
     args = parser.parse_args()
 
     data_dir = args.data_dir or find_data_dir(SCRIPT_DIR)
@@ -255,16 +287,17 @@ def main():
     print(f"Data dir : {data_dir}")
     print(f"Database : {args.db}")
     print(f"Tables   : {', '.join(tables)}")
+    print(f"Batch    : {args.batch_size:,}")
     print()
 
     # Parse XSD schemas
     schemas: dict[str, tuple[str, list[tuple[str, str]]]] = {}
     for table_name in tables:
-        xsd_path = XSD_DIR / f"{table_name}.xsd"
-        if not xsd_path.exists():
+        xsd_bytes = load_xsd_bytes(table_name)
+        if xsd_bytes is None:
             print(f"  [warn] No XSD found for {table_name}, skipping")
             continue
-        _, row_tag, fields = parse_xsd(xsd_path)
+        _, row_tag, fields = parse_xsd(f"{table_name}.xsd", xsd_bytes)
         schemas[table_name] = (row_tag, fields)
         print(f"  Schema: {table_name} — {len(fields)} columns, row tag <{row_tag}>")
 
@@ -272,6 +305,7 @@ def main():
 
     # Open database
     conn = duckdb.connect(str(args.db))
+    conn.execute("PRAGMA threads = 4")
     ensure_progress_table(conn)
 
     # Create / reset tables
@@ -289,7 +323,7 @@ def main():
     try:
         for table_name, (row_tag, fields) in schemas.items():
             print(f"Importing {table_name} ...")
-            n = import_table(conn, table_name, row_tag, fields, data_dir)
+            n = import_table(conn, table_name, row_tag, fields, data_dir, args.batch_size)
             print(f"  → {n:,} rows total\n")
             grand_total += n
     except KeyboardInterrupt:
