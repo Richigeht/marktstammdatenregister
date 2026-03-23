@@ -4,8 +4,10 @@ on:
   push:
     branches: ["main"]
     paths:
-      - "docs/**"
       - "site/**"
+      - "src/**"
+      - "pyproject.toml"
+      - "uv.lock"
       - ".github/workflows/pages.yml"
   workflow_dispatch:
 
@@ -27,8 +29,19 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync --locked
+
       - name: Build publish directory
-        run: uvx --from . build-static-site
+        run: uv run build-static-site
 
       - name: Upload Pages artifact
         uses: actions/upload-pages-artifact@v3

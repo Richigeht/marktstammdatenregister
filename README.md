@@ -151,12 +151,17 @@ python3 -m http.server 8000 -d docs
 Open `http://localhost:8000`.
 
 To host on GitHub Pages:
-- commit `site/`, `docs/`, and `docs/data/`
+- commit `site/` and the workflow files
 - enable GitHub Pages in repo settings
-- the included workflow [pages.yml](/Users/kissinger/VSCode/marktstammdatenregister/.github/workflows/pages.yml) deploys the contents of `docs/` on pushes to `main`
+- [pages.yml](/Users/kissinger/VSCode/marktstammdatenregister/.github/workflows/pages.yml) rebuilds `docs/` from `site/` and deploys on pushes to `main`
+- [refresh-pages-data.yml](/Users/kissinger/VSCode/marktstammdatenregister/.github/workflows/refresh-pages-data.yml) can run on a schedule or manually, download the latest MaStR ZIP, unzip it, run ETL/export/site build, deploy the updated `docs/`, and commit refreshed `docs/` back to `main`
 
 This route does not need Streamlit, DuckDB, or Python on the host. The data is precomputed during export, and the browser filters the GeoJSON client-side.
 The public static site uses approximate coordinates by default to avoid republishing exact points in a clean bulk form.
+
+Notes:
+- GitHub Actions artifacts are separate from git history; they are not stored "inside" the repository tree.
+- If you want the generated static output versioned in the repo as well, the refresh workflow includes a commit step for `docs/`.
 
 ### Run the static browser in a container
 
