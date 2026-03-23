@@ -1,0 +1,185 @@
+name: Refresh Pages Data
+
+on:
+  schedule:
+    - cron: "20 4 * * *"
+  workflow_dispatch:
+    inputs:
+      source_page_url:
+        description: "Optional MaStR download page URL override"
+        required: false
+        default: "https://www.marktstammdatenregister.de/MaStR/Datendownload"
+      persist_to_repo:
+        description: "Commit refreshed docs/ back to main"
+        required: false
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+
+concurrency:
+  group: "pages-data-refresh"
+  cancel-in-progress: true
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    env:
+      DEFAULT_SOURCE_PAGE_URL: https://www.marktstammdatenregister.de/MaStR/Datendownload
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Resolve latest MaStR ZIP
+        id: resolve
+        env:
+          SOURCE_PAGE_URL: ${{ inputs.source_page_url || env.DEFAULT_SOURCE_PAGE_URL }}
+        run: |
+          python - <<'PY'
+          import os
+          import re
+          import urllib.request
+          from html.parser import HTMLParser
+          from urllib.parse import urljoin, urlparse
+
+          page_url = os.environ["SOURCE_PAGE_URL"]
+          with urllib.request.urlopen(page_url) as response:
+              html = response.read().decode("utf-8", errors="ignore")
+
+          class LinkParser(HTMLParser):
+              def __init__(self):
+                  super().__init__()
+                  self.links = []
+                  self._href = None
+                  self._text = []
+
+              def handle_starttag(self, tag, attrs):
+                  if tag == "a":
+                      self._href = dict(attrs).get("href")
+                      self._text = []
+
+              def handle_data(self, data):
+                  if self._href is not None:
+                      self._text.append(data)
+
+              def handle_endtag(self, tag):
+                  if tag == "a" and self._href is not None:
+                      text = " ".join(part.strip() for part in self._text if part.strip())
+                      self.links.append((self._href, text))
+                      self._href = None
+                      self._text = []
+
+          parser = LinkParser()
+          parser.feed(html)
+
+          candidates = []
+          for href, text in parser.links:
+              full_url = urljoin(page_url, href)
+              href_lower = full_url.lower()
+              text_lower = text.lower()
+              if ".zip" not in href_lower:
+                  continue
+              score = 0
+              if "download daten" in text_lower:
+                  score += 100
+              if "beschreibung" in text_lower or "dokumentation" in text_lower:
+                  score -= 100
+              if "xsd" in href_lower or "beschreibung" in href_lower or "dokumentation" in href_lower:
+                  score -= 100
+              if "gesamtdatenexport" in href_lower:
+                  score += 25
+              candidates.append((score, full_url, text))
+
+          if not candidates:
+              fallback_urls = re.findall(r'https?://[^"\'>]+\.zip', html, flags=re.IGNORECASE)
+              for url in fallback_urls:
+                  url_lower = url.lower()
+                  if "beschreibung" in url_lower or "dokumentation" in url_lower or "xsd" in url_lower:
+                      continue
+                  candidates.append((10, url, ""))
+
+          if not candidates:
+              raise SystemExit(f"Could not resolve a MaStR ZIP link from {page_url}")
+
+          _, zip_url, _ = max(candidates, key=lambda item: item[0])
+          filename = os.path.basename(urlparse(zip_url).path) or "mastr-export.zip"
+
+          github_output = os.environ["GITHUB_OUTPUT"]
+          with open(github_output, "a", encoding="utf-8") as fh:
+              fh.write(f"zip_url={zip_url}\n")
+              fh.write(f"zip_name={filename}\n")
+
+          print(f"Resolved ZIP URL: {zip_url}")
+          PY
+
+      - name: Download latest MaStR ZIP
+        run: curl --fail --location --output "$RUNNER_TEMP/${{ steps.resolve.outputs.zip_name }}" "${{ steps.resolve.outputs.zip_url }}"
+
+      - name: Unzip latest MaStR export
+        id: unzip
+        run: |
+          target_dir="$RUNNER_TEMP/mastr-export"
+          rm -rf "$target_dir"
+          mkdir -p "$target_dir"
+          unzip -q "$RUNNER_TEMP/${{ steps.resolve.outputs.zip_name }}" -d "$target_dir"
+          data_dir="$(find "$target_dir" -mindepth 1 -maxdepth 1 -type d -name 'Gesamtdatenexport_*' | sort | tail -n 1)"
+          if [ -z "$data_dir" ]; then
+            echo "No Gesamtdatenexport_* directory found after unzip" >&2
+            exit 1
+          fi
+          echo "data_dir=$data_dir" >> "$GITHUB_OUTPUT"
+
+      - name: Rebuild exported data and static site
+        run: |
+          rm -rf docs/data
+          mkdir -p docs/data
+          uv run etl --data-dir "${{ steps.unzip.outputs.data_dir }}" --db "$RUNNER_TEMP/mastr.duckdb"
+          uv run export-bess --db "$RUNNER_TEMP/mastr.duckdb" --out-dir docs/data
+          uv run build-static-site
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pages-build
+          path: docs
+
+      - name: Commit refreshed docs
+        if: github.ref == 'refs/heads/main' && (github.event_name == 'schedule' || inputs.persist_to_repo)
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs
+          if git diff --cached --quiet; then
+            echo "No docs changes to commit"
+            exit 0
+          fi
+          git commit -m "Update generated Pages artifacts"
+          git push
+
+      - name: Upload Pages artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
