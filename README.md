@@ -155,6 +155,7 @@ To host on GitHub Pages:
 - enable GitHub Pages in repo settings
 - [pages.yml](/Users/kissinger/VSCode/marktstammdatenregister/.github/workflows/pages.yml) rebuilds `dist/` from `site/` and deploys the generated Pages artifact on pushes to `main`
 - [refresh-pages-data.yml](/Users/kissinger/VSCode/marktstammdatenregister/.github/workflows/refresh-pages-data.yml) can run on a schedule or manually, download the latest MaStR ZIP, unzip it, run ETL/export/site build, and deploy the updated `dist/` as the Pages artifact
+- [smoke-test-pages.yml](/Users/kissinger/VSCode/marktstammdatenregister/.github/workflows/smoke-test-pages.yml) is a fast manual smoke test that skips the large download, generates a tiny fixture dataset, runs the ETL/export/site build, and uploads a build artifact without deploying Pages
 
 This route does not need Streamlit, DuckDB, or Python on the host. The data is precomputed during export, and the browser filters the GeoJSON client-side.
 The public static site uses approximate coordinates by default to avoid republishing exact points in a clean bulk form.
