@@ -7,16 +7,16 @@ import argparse
 import shutil
 from pathlib import Path
 
-from .paths import DOCS_DIR, SITE_DIR
+from .paths import DIST_DIR, SITE_DIR
 
 
 ASSET_FILES = ["index.html", "app.js", "styles.css"]
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Build the static BESS site into docs/")
+    parser = argparse.ArgumentParser(description="Build the static BESS site into dist/")
     parser.add_argument("--source-dir", type=Path, default=SITE_DIR, help="Static site source directory")
-    parser.add_argument("--publish-dir", type=Path, default=DOCS_DIR, help="Publish directory")
+    parser.add_argument("--publish-dir", type=Path, default=DIST_DIR, help="Publish directory")
     args = parser.parse_args()
 
     source_dir = args.source_dir.expanduser()
@@ -34,4 +34,3 @@ def main():
     nojekyll = publish_dir / ".nojekyll"
     nojekyll.write_text("", encoding="utf-8")
     print(f"Wrote {nojekyll}")
-

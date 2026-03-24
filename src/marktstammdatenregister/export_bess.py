@@ -10,7 +10,7 @@ from pathlib import Path
 import pandas as pd
 
 from .data import DEFAULT_DB, load_bess_dataframe, open_db
-from .paths import DOCS_DATA_DIR
+from .paths import DIST_DATA_DIR
 
 
 FULL_EXPORT_COLUMNS = [
@@ -115,7 +115,7 @@ def write_summary(all_df: pd.DataFrame, public_df: pd.DataFrame, out_path: Path,
 def main():
     parser = argparse.ArgumentParser(description="Export MaStR BESS artifacts")
     parser.add_argument("--db", type=Path, default=DEFAULT_DB, help="DuckDB file path")
-    parser.add_argument("--out-dir", type=Path, default=DOCS_DATA_DIR, help="Output directory")
+    parser.add_argument("--out-dir", type=Path, default=DIST_DATA_DIR, help="Output directory")
     parser.add_argument(
         "--profile",
         choices=["public", "internal", "full"],
