@@ -1,0 +1,132 @@
+name: Smoke Test Pages Build
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  smoke-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+
+      - name: Install dependencies
+        run: uv sync --locked
+
+      - name: Build smoke-test fixture
+        id: smoke
+        run: |
+          fixture_dir="$RUNNER_TEMP/mastr-smoke"
+          rm -rf "$fixture_dir"
+          mkdir -p "$fixture_dir"
+          FIXTURE_DIR="$fixture_dir" python - <<'PY'
+          import os
+          from pathlib import Path
+          from xml.etree.ElementTree import Element, SubElement, ElementTree
+
+          fixture_dir = Path(os.environ["FIXTURE_DIR"])
+
+          def write_table(table_name: str, row_tag: str, records: list[dict[str, str]]) -> None:
+              root = Element(table_name)
+              for record in records:
+                  row = SubElement(root, row_tag)
+                  for key, value in record.items():
+                      child = SubElement(row, key)
+                      child.text = value
+              ElementTree(root).write(fixture_dir / f"{table_name}.xml", encoding="utf-8", xml_declaration=True)
+
+          write_table(
+              "Katalogwerte",
+              "Katalogwert",
+              [
+                  {"Id": "11", "Wert": "Berlin", "KatalogKategorieId": "1"},
+                  {"Id": "21", "Wert": "Lithium-Batterie", "KatalogKategorieId": "2"},
+                  {"Id": "31", "Wert": "In Betrieb", "KatalogKategorieId": "3"},
+                  {"Id": "41", "Wert": "Batteriespeicher", "KatalogKategorieId": "4"},
+                  {"Id": "51", "Wert": "Strom", "KatalogKategorieId": "5"},
+              ],
+          )
+          write_table(
+              "Marktakteure",
+              "Marktakteur",
+              [
+                  {
+                      "MastrNummer": "Akteur0001",
+                      "Firmenname": "Smoke Test Storage GmbH",
+                      "DatumLetzeAktualisierung": "2026-03-24T00:00:00",
+                  }
+              ],
+          )
+          write_table(
+              "AnlagenStromSpeicher",
+              "AnlageStromSpeicher",
+              [
+                  {
+                      "MaStRNummer": "Speicher0001",
+                      "Registrierungsdatum": "2026-03-24",
+                      "DatumLetzteAktualisierung": "2026-03-24T00:00:00",
+                      "NutzbareSpeicherkapazitaet": "2500",
+                      "AnlageBetriebsstatus": "31",
+                  }
+              ],
+          )
+          write_table(
+              "EinheitenStromSpeicher",
+              "EinheitStromSpeicher",
+              [
+                  {
+                      "EinheitMastrNummer": "SEE000000000001",
+                      "DatumLetzteAktualisierung": "2026-03-24T00:00:00",
+                      "AnlagenbetreiberMastrNummer": "Akteur0001",
+                      "Bundesland": "11",
+                      "Landkreis": "Berlin",
+                      "Gemeinde": "Berlin",
+                      "Postleitzahl": "10115",
+                      "Ort": "Berlin",
+                      "Strasse": "Teststrasse",
+                      "Hausnummer": "1",
+                      "Breitengrad": "52.5200",
+                      "Laengengrad": "13.4050",
+                      "Inbetriebnahmedatum": "2026-03-24",
+                      "Registrierungsdatum": "2026-03-24",
+                      "Nettonennleistung": "1250",
+                      "Bruttoleistung": "1300",
+                      "SpeMastrNummer": "Speicher0001",
+                      "NameStromerzeugungseinheit": "Smoke Test BESS",
+                      "Batterietechnologie": "21",
+                      "EinheitBetriebsstatus": "31",
+                      "Technologie": "41",
+                      "Energietraeger": "51",
+                  }
+              ],
+          )
+          PY
+          echo "data_dir=$fixture_dir" >> "$GITHUB_OUTPUT"
+
+      - name: Run ETL, export, and static build
+        run: |
+          rm -rf dist
+          mkdir -p dist/data
+          uv run etl \
+            --data-dir "${{ steps.smoke.outputs.data_dir }}" \
+            --db "$RUNNER_TEMP/mastr-smoke.duckdb" \
+            --tables Katalogwerte Marktakteure AnlagenStromSpeicher EinheitenStromSpeicher
+          uv run export-bess --db "$RUNNER_TEMP/mastr-smoke.duckdb" --out-dir dist/data
+          uv run build-static-site
+
+      - name: Upload smoke build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: pages-build-smoke
+          path: dist
