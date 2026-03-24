@@ -6,8 +6,8 @@ Imports the German energy asset registry ([MaStR](https://www.marktstammdatenreg
 
 - `src/marktstammdatenregister/` — Python package for ETL, export, and app logic
 - `site/` — source files for the static browser
-- `docs/` — published static site for GitHub Pages and the container image
-- `docs/data/` — exported static data artifacts consumed by the browser
+- `dist/` — generated static site output for GitHub Pages and the container image
+- `dist/data/` — exported static data artifacts consumed by the browser
 
 ## What's in the database
 
@@ -102,9 +102,9 @@ If your DuckDB is stored elsewhere, change the path in the sidebar after the app
 uv run export-bess
 ```
 
-By default this now writes a public-safe payload directly into `docs/data/`:
-- `docs/data/bess.geojson` with mapped plants only and rounded coordinates
-- `docs/data/summary.json` with total and public summary counts
+By default this now writes a public-safe payload directly into `dist/data/`:
+- `dist/data/bess.geojson` with mapped plants only and rounded coordinates
+- `dist/data/summary.json` with total and public summary counts
 
 That default is intended for GitHub Pages, static hosting, and the container.
 
@@ -128,24 +128,24 @@ If you explicitly want the heavy full export again:
 uv run export-bess --profile full --format parquet json geojson
 ```
 
-For a static website, run ETL and export in a build step somewhere else, then publish only `docs/` including `docs/data/`.
+For a static website, run ETL and export in a build step somewhere else, then publish only `dist/` including `dist/data/`.
 
 ### Static site for GitHub Pages
 
-The repo includes a static frontend source in [site/index.html](/Users/kissinger/VSCode/marktstammdatenregister/site/index.html). The published output lives in [docs/index.html](/Users/kissinger/VSCode/marktstammdatenregister/docs/index.html) and reads exported data from `docs/data/`.
+The repo includes a static frontend source in [site/index.html](/Users/kissinger/VSCode/marktstammdatenregister/site/index.html). The generated publish output lives in `dist/` and reads exported data from `dist/data/`.
 
 Build the static payload like this:
 
 ```bash
 uv run etl
-uv run export-bess --out-dir docs/data
+uv run export-bess --out-dir dist/data
 uv run build-static-site
 ```
 
 Then preview locally:
 
 ```bash
-python3 -m http.server 8000 -d docs
+python3 -m http.server 8000 -d dist
 ```
 
 Open `http://localhost:8000`.
@@ -153,19 +153,19 @@ Open `http://localhost:8000`.
 To host on GitHub Pages:
 - commit `site/` and the workflow files
 - enable GitHub Pages in repo settings
-- [pages.yml](/Users/kissinger/VSCode/marktstammdatenregister/.github/workflows/pages.yml) rebuilds `docs/` from `site/` and deploys on pushes to `main`
-- [refresh-pages-data.yml](/Users/kissinger/VSCode/marktstammdatenregister/.github/workflows/refresh-pages-data.yml) can run on a schedule or manually, download the latest MaStR ZIP, unzip it, run ETL/export/site build, deploy the updated `docs/`, and commit refreshed `docs/` back to `main`
+- [pages.yml](/Users/kissinger/VSCode/marktstammdatenregister/.github/workflows/pages.yml) rebuilds `dist/` from `site/` and deploys the generated Pages artifact on pushes to `main`
+- [refresh-pages-data.yml](/Users/kissinger/VSCode/marktstammdatenregister/.github/workflows/refresh-pages-data.yml) can run on a schedule or manually, download the latest MaStR ZIP, unzip it, run ETL/export/site build, and deploy the updated `dist/` as the Pages artifact
 
 This route does not need Streamlit, DuckDB, or Python on the host. The data is precomputed during export, and the browser filters the GeoJSON client-side.
 The public static site uses approximate coordinates by default to avoid republishing exact points in a clean bulk form.
 
 Notes:
 - GitHub Actions artifacts are separate from git history; they are not stored "inside" the repository tree.
-- If you want the generated static output versioned in the repo as well, the refresh workflow includes a commit step for `docs/`.
+- `dist/` is generated output and should not be committed.
 
 ### Run the static browser in a container
 
-Once `docs/` and `docs/data/` are populated, build and run the container:
+Once `dist/` and `dist/data/` are populated, build and run the container:
 
 ```bash
 docker build -t mastr-bess-static .
@@ -174,11 +174,11 @@ docker run --rm -p 8080:80 mastr-bess-static
 
 Then open `http://localhost:8080`.
 
-The container serves the static `docs/` output with Nginx. It does not run ETL or DuckDB inside the container. The intended flow is:
+The container serves the static `dist/` output with Nginx. It does not run ETL or DuckDB inside the container. The intended flow is:
 1. run `uv run etl`
-2. run `uv run export-bess --out-dir docs/data`
+2. run `uv run export-bess --out-dir dist/data`
 3. run `uv run build-static-site`
-4. build the container or deploy `docs/` to GitHub Pages
+4. build the container or deploy `dist/` to GitHub Pages
 
 ### Open the UI
 
