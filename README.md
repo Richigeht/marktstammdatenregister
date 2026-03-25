@@ -153,8 +153,8 @@ Open `http://localhost:8000`.
 To host on GitHub Pages:
 - commit `site/` and the workflow files
 - enable GitHub Pages in repo settings
-- [pages.yml](/Users/kissinger/VSCode/marktstammdatenregister/.github/workflows/pages.yml) rebuilds `dist/` from `site/` and deploys the generated Pages artifact on pushes to `release/main`
-- [refresh-pages-data.yml](/Users/kissinger/VSCode/marktstammdatenregister/.github/workflows/refresh-pages-data.yml) can run on a schedule or manually, checks out `release/main`, downloads the latest MaStR ZIP, runs ETL/export/site build, and deploys the updated `dist/` as the Pages artifact
+- [pages.yml](/Users/kissinger/VSCode/marktstammdatenregister/.github/workflows/pages.yml) rebuilds the static shell from `site/` on pushes to `release/main` and uploads it as a validation artifact
+- [refresh-pages-data.yml](/Users/kissinger/VSCode/marktstammdatenregister/.github/workflows/refresh-pages-data.yml) is the workflow that deploys the live Pages site: it checks out `release/main`, downloads the latest MaStR ZIP, runs ETL/export/site build, and publishes the complete `dist/` artifact including `dist/data/`
 - [smoke-test-pages.yml](/Users/kissinger/VSCode/marktstammdatenregister/.github/workflows/smoke-test-pages.yml) is a fast manual smoke test that skips the large download, generates a tiny fixture dataset, runs the ETL/export/site build, and uploads a build artifact without deploying Pages
 
 This route does not need Streamlit, DuckDB, or Python on the host. The data is precomputed during export, and the browser filters the GeoJSON client-side.

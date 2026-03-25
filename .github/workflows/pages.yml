@@ -1,4 +1,4 @@
-name: Deploy Pages
+name: Validate Pages Source
 
 on:
   push:
@@ -13,25 +13,18 @@ on:
 
 permissions:
   contents: read
-  pages: write
-  id-token: write
 
 concurrency:
   group: "pages"
   cancel-in-progress: true
 
 jobs:
-  deploy:
+  validate:
     runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    env:
-      DEPLOY_REF: release/main
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ env.DEPLOY_REF }}
+          ref: release/main
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -44,14 +37,11 @@ jobs:
       - name: Install dependencies
         run: uv sync --locked
 
-      - name: Build publish directory
+      - name: Build static shell
         run: uv run build-static-site
 
-      - name: Upload Pages artifact
-        uses: actions/upload-pages-artifact@v3
+      - name: Upload validation artifact
+        uses: actions/upload-artifact@v4
         with:
+          name: pages-shell-preview
           path: dist
-
-      - name: Deploy to GitHub Pages
-        id: deployment
-        uses: actions/deploy-pages@v4
