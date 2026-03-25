@@ -5,6 +5,7 @@ Export BESS datasets from MaStR DuckDB.
 
 import argparse
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 
 import pandas as pd
@@ -94,7 +95,14 @@ def build_geojson(df: pd.DataFrame) -> dict:
     return {"type": "FeatureCollection", "features": features}
 
 
-def write_summary(all_df: pd.DataFrame, public_df: pd.DataFrame, out_path: Path, coordinate_precision: int):
+def write_summary(
+    all_df: pd.DataFrame,
+    public_df: pd.DataFrame,
+    out_path: Path,
+    coordinate_precision: int,
+    source_export_date: str | None,
+    built_at_utc: str,
+):
     summary = {
         "plants": int(len(all_df)),
         "mapped_plants": int(len(public_df)),
@@ -104,6 +112,8 @@ def write_summary(all_df: pd.DataFrame, public_df: pd.DataFrame, out_path: Path,
         "public_net_power_mw": round(float(public_df["net_power_mw"].fillna(0).sum()), 3),
         "public_usable_capacity_mwh": round(float(public_df["usable_capacity_mwh"].fillna(0).sum()), 3),
         "coordinate_precision_decimals": coordinate_precision,
+        "source_export_date": source_export_date,
+        "built_at_utc": built_at_utc,
         "bundeslaender": sorted(value for value in all_df["bundesland"].dropna().unique() if value),
         "operating_statuses": sorted(
             value for value in all_df["operating_status"].dropna().unique() if value
@@ -135,6 +145,11 @@ def main():
         default=2,
         help="Decimal precision for rounded public coordinates (default: 2)",
     )
+    parser.add_argument(
+        "--source-export-date",
+        default=None,
+        help="Optional source export date string to embed in summary metadata",
+    )
     args = parser.parse_args()
 
     conn = open_db(args.db, read_only=True)
@@ -148,6 +163,7 @@ def main():
 
     out_dir = args.out_dir.expanduser()
     out_dir.mkdir(parents=True, exist_ok=True)
+    built_at_utc = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     full_df = normalize_records(df, FULL_EXPORT_COLUMNS)
     mapped_exact_df = normalize_records(
         df.dropna(subset=["latitude", "longitude"]).copy(),
@@ -181,5 +197,12 @@ def main():
         print(f"Wrote {geojson_path}")
 
     summary_path = out_dir / "summary.json"
-    write_summary(full_df, public_df, summary_path, args.coordinate_decimals)
+    write_summary(
+        full_df,
+        public_df,
+        summary_path,
+        args.coordinate_decimals,
+        args.source_export_date,
+        built_at_utc,
+    )
     print(f"Wrote {summary_path}")

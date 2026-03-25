@@ -9,6 +9,7 @@ const state = {
 
 const elements = {
   statusBanner: document.getElementById("status-banner"),
+  datasetMeta: document.getElementById("dataset-meta"),
   plantsCount: document.getElementById("plants-count"),
   mappedCount: document.getElementById("mapped-count"),
   powerSum: document.getElementById("power-sum"),
@@ -29,6 +30,8 @@ const datasetSummary = {
   plants: 0,
   mappedPlants: 0,
   coordinatePrecision: null,
+  sourceExportDate: null,
+  builtAtUtc: null,
 };
 
 const map = L.map("map", { preferCanvas: true }).setView([51.1, 10.3], 6);
@@ -47,6 +50,44 @@ function formatNumber(value, digits = 1) {
 
 function metricText(value, suffix) {
   return `${formatNumber(value, 1)} ${suffix}`;
+}
+
+function formatIsoDate(value, options) {
+  if (!value) {
+    return null;
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return new Intl.DateTimeFormat("de-DE", options).format(date);
+}
+
+function renderDatasetMeta() {
+  const parts = [];
+  const sourceDate = formatIsoDate(datasetSummary.sourceExportDate, {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    timeZone: "UTC",
+  });
+  const builtAt = formatIsoDate(datasetSummary.builtAtUtc, {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZoneName: "short",
+  });
+
+  if (sourceDate) {
+    parts.push(`Source export: ${sourceDate}`);
+  }
+  if (builtAt) {
+    parts.push(`Site build: ${builtAt}`);
+  }
+
+  elements.datasetMeta.textContent = parts.join(" | ");
 }
 
 function setStatusBanner(message) {
@@ -289,6 +330,8 @@ async function loadData() {
   datasetSummary.plants = summary.plants || 0;
   datasetSummary.mappedPlants = summary.mapped_plants || 0;
   datasetSummary.coordinatePrecision = summary.coordinate_precision_decimals || null;
+  datasetSummary.sourceExportDate = summary.source_export_date || null;
+  datasetSummary.builtAtUtc = summary.built_at_utc || null;
 
   state.records = geojson.features.map((feature) => ({
     ...feature.properties,
@@ -310,6 +353,7 @@ async function loadData() {
   fillSelect(elements.stateFilter, optionValues(state.records, "bundesland"));
   fillSelect(elements.statusFilter, optionValues(state.records, "operating_status"));
   fillSelect(elements.technologyFilter, optionValues(state.records, "battery_technology"));
+  renderDatasetMeta();
 }
 
 async function init() {

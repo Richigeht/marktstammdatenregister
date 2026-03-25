@@ -153,12 +153,13 @@ Open `http://localhost:8000`.
 To host on GitHub Pages:
 - commit `site/` and the workflow files
 - enable GitHub Pages in repo settings
-- [pages.yml](/Users/kissinger/VSCode/marktstammdatenregister/.github/workflows/pages.yml) rebuilds `dist/` from `site/` and deploys the generated Pages artifact on pushes to `main`
-- [refresh-pages-data.yml](/Users/kissinger/VSCode/marktstammdatenregister/.github/workflows/refresh-pages-data.yml) can run on a schedule or manually, download the latest MaStR ZIP, unzip it, run ETL/export/site build, and deploy the updated `dist/` as the Pages artifact
+- [pages.yml](/Users/kissinger/VSCode/marktstammdatenregister/.github/workflows/pages.yml) rebuilds `dist/` from `site/` and deploys the generated Pages artifact on pushes to `release/main`
+- [refresh-pages-data.yml](/Users/kissinger/VSCode/marktstammdatenregister/.github/workflows/refresh-pages-data.yml) can run on a schedule or manually, checks out `release/main`, downloads the latest MaStR ZIP, runs ETL/export/site build, and deploys the updated `dist/` as the Pages artifact
 - [smoke-test-pages.yml](/Users/kissinger/VSCode/marktstammdatenregister/.github/workflows/smoke-test-pages.yml) is a fast manual smoke test that skips the large download, generates a tiny fixture dataset, runs the ETL/export/site build, and uploads a build artifact without deploying Pages
 
 This route does not need Streamlit, DuckDB, or Python on the host. The data is precomputed during export, and the browser filters the GeoJSON client-side.
 The public static site uses approximate coordinates by default to avoid republishing exact points in a clean bulk form.
+The generated `summary.json` also carries metadata for the source export date and the UTC build timestamp so the site can show when the underlying MaStR dump was published and when the static site was rebuilt.
 
 Notes:
 - GitHub Actions artifacts are separate from git history; they are not stored "inside" the repository tree.

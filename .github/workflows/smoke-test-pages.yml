@@ -122,7 +122,10 @@ jobs:
             --data-dir "${{ steps.smoke.outputs.data_dir }}" \
             --db "$RUNNER_TEMP/mastr-smoke.duckdb" \
             --tables Katalogwerte Marktakteure AnlagenStromSpeicher EinheitenStromSpeicher
-          uv run export-bess --db "$RUNNER_TEMP/mastr-smoke.duckdb" --out-dir dist/data
+          uv run export-bess \
+            --db "$RUNNER_TEMP/mastr-smoke.duckdb" \
+            --out-dir dist/data \
+            --source-export-date "2026-03-24"
           uv run build-static-site
 
       - name: Upload smoke build artifact

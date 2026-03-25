@@ -28,10 +28,12 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     env:
       DEFAULT_SOURCE_PAGE_URL: https://www.marktstammdatenregister.de/MaStR/Datendownload
+      DEPLOY_REF: release/main
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+          ref: ${{ env.DEPLOY_REF }}
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -152,8 +154,12 @@ jobs:
         run: |
           rm -rf dist
           mkdir -p dist/data
+          source_export_date="$(echo "${{ steps.resolve.outputs.zip_name }}" | sed -E 's/.*Gesamtdatenexport_([0-9]{4})([0-9]{2})([0-9]{2}).*/\1-\2-\3/')"
           uv run etl --data-dir "${{ steps.unzip.outputs.data_dir }}" --db "$RUNNER_TEMP/mastr.duckdb"
-          uv run export-bess --db "$RUNNER_TEMP/mastr.duckdb" --out-dir dist/data
+          uv run export-bess \
+            --db "$RUNNER_TEMP/mastr.duckdb" \
+            --out-dir dist/data \
+            --source-export-date "$source_export_date"
           uv run build-static-site
 
       - name: Upload build artifact

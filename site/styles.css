@@ -67,6 +67,12 @@ h1 {
   color: var(--muted);
 }
 
+.dataset-meta {
+  margin: 0.7rem 0 0;
+  font-size: 0.95rem;
+  color: var(--muted);
+}
+
 .status-banner {
   margin: 1rem 0 0;
   padding: 0.8rem 1rem;
