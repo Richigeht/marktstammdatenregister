@@ -2,7 +2,7 @@ name: Validate Pages Source
 
 on:
   push:
-    branches: ["release/main"]
+    branches: ["main"]
     paths:
       - "site/**"
       - "src/**"
@@ -23,8 +23,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: release/main
 
       - name: Set up Python
         uses: actions/setup-python@v5

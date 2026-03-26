@@ -7,10 +7,11 @@ import argparse
 import shutil
 from pathlib import Path
 
-from .paths import DIST_DIR, SITE_DIR
+from .paths import DIST_DIR, PROJECT_ROOT, SITE_DIR
 
 
 ASSET_FILES = ["index.html", "app.js", "styles.css"]
+OPTIONAL_ROOT_FILES = [PROJECT_ROOT / "CNAME", SITE_DIR / "CNAME"]
 
 
 def main():
@@ -30,6 +31,14 @@ def main():
             raise SystemExit(f"Missing site asset: {src}")
         shutil.copy2(src, dst)
         print(f"Copied {src} -> {dst}")
+
+    for src in OPTIONAL_ROOT_FILES:
+        if not src.exists():
+            continue
+        dst = publish_dir / src.name
+        shutil.copy2(src, dst)
+        print(f"Copied {src} -> {dst}")
+        break
 
     nojekyll = publish_dir / ".nojekyll"
     nojekyll.write_text("", encoding="utf-8")

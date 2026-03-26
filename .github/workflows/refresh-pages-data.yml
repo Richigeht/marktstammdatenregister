@@ -28,12 +28,10 @@ jobs:
       url: ${{ steps.deployment.outputs.page_url }}
     env:
       DEFAULT_SOURCE_PAGE_URL: https://www.marktstammdatenregister.de/MaStR/Datendownload
-      DEPLOY_REF: release/main
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: ${{ env.DEPLOY_REF }}
 
       - name: Set up Python
         uses: actions/setup-python@v5

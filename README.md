@@ -11,18 +11,18 @@ Imports the German energy asset registry ([MaStR](https://www.marktstammdatenreg
 
 ## What's in the database
 
-| Table | Description |
-|---|---|
-| `EinheitenStromSpeicher` | Battery storage units (BESS) — location, power, technology, status |
-| `AnlagenEegSpeicher` | EEG subsidy data for storage systems |
-| `AnlagenStromSpeicher` | Storage system registrations (capacity, linked units) |
-| `EinheitenAenderungNetzbetreiberzuordnungen` | Changes to grid operator assignments |
-| `Netzanschlusspunkte` | Grid connection points |
-| `Netze` | Grid networks |
-| `Marktakteure` | Market participants (operators, grid operators, etc.) |
-| `Katalogkategorien` | Lookup: enum category names |
-| `Katalogwerte` | Lookup: enum code → human-readable label |
-| `_import_progress` | Internal: tracks which files have been imported |
+| Table                                        | Description                                                        |
+| -------------------------------------------- | ------------------------------------------------------------------ |
+| `EinheitenStromSpeicher`                     | Battery storage units (BESS) — location, power, technology, status |
+| `AnlagenEegSpeicher`                         | EEG subsidy data for storage systems                               |
+| `AnlagenStromSpeicher`                       | Storage system registrations (capacity, linked units)              |
+| `EinheitenAenderungNetzbetreiberzuordnungen` | Changes to grid operator assignments                               |
+| `Netzanschlusspunkte`                        | Grid connection points                                             |
+| `Netze`                                      | Grid networks                                                      |
+| `Marktakteure`                               | Market participants (operators, grid operators, etc.)              |
+| `Katalogkategorien`                          | Lookup: enum category names                                        |
+| `Katalogwerte`                               | Lookup: enum code → human-readable label                           |
+| `_import_progress`                           | Internal: tracks which files have been imported                    |
 
 Enum fields (e.g. `Bundesland`, `Batterietechnologie`) are stored as integer codes.
 Join to `Katalogwerte` to resolve them to text — see [Resolving enum codes](#resolving-enum-codes) below.
@@ -56,21 +56,25 @@ Large tables (e.g. `EinheitenStromSpeicher`) take a few minutes.
 The importer reads schemas from either the extracted `xsd/` folder or the bundled `xsd.zip`.
 
 **Resume after interruption** — already-completed files are tracked in `_import_progress` and skipped automatically:
+
 ```bash
 uv run etl   # safe to re-run
 ```
 
 **Import specific tables only:**
+
 ```bash
 uv run etl --tables EinheitenStromSpeicher AnlagenEegSpeicher
 ```
 
 **Re-import from scratch (drop + recreate):**
+
 ```bash
 uv run etl --drop
 ```
 
 **Check import progress:**
+
 ```sql
 SELECT table_name, COUNT(*) AS files, SUM(rows) AS total_rows
 FROM _import_progress
@@ -89,6 +93,7 @@ uv run streamlit run src/marktstammdatenregister/streamlit_app.py
 The app opens the generated `mastr.duckdb`, lets you filter storage plants by state, status, battery technology, power, and capacity, and shows matching assets on a map using the MaStR latitude/longitude fields.
 
 Features:
+
 - map view of BESS plants with size-scaled markers
 - browsable table with export to CSV
 - detail view for a selected plant with operator, status, power, capacity, and address fields
@@ -103,6 +108,7 @@ uv run export-bess
 ```
 
 By default this now writes a public-safe payload directly into `dist/data/`:
+
 - `dist/data/bess.geojson` with mapped plants only and rounded coordinates
 - `dist/data/summary.json` with total and public summary counts
 
@@ -132,7 +138,7 @@ For a static website, run ETL and export in a build step somewhere else, then pu
 
 ### Static site for GitHub Pages
 
-The repo includes a static frontend source in [site/index.html](/Users/kissinger/VSCode/marktstammdatenregister/site/index.html). The generated publish output lives in `dist/` and reads exported data from `dist/data/`.
+The repo includes a static frontend source in [site/index.html](site/index.html). The generated publish output lives in `dist/` and reads exported data from `dist/data/`.
 
 Build the static payload like this:
 
@@ -151,17 +157,19 @@ python3 -m http.server 8000 -d dist
 Open `http://localhost:8000`.
 
 To host on GitHub Pages:
+
 - commit `site/` and the workflow files
 - enable GitHub Pages in repo settings
-- [pages.yml](/Users/kissinger/VSCode/marktstammdatenregister/.github/workflows/pages.yml) rebuilds the static shell from `site/` on pushes to `release/main` and uploads it as a validation artifact
-- [refresh-pages-data.yml](/Users/kissinger/VSCode/marktstammdatenregister/.github/workflows/refresh-pages-data.yml) is the workflow that deploys the live Pages site: it checks out `release/main`, downloads the latest MaStR ZIP, runs ETL/export/site build, and publishes the complete `dist/` artifact including `dist/data/`
-- [smoke-test-pages.yml](/Users/kissinger/VSCode/marktstammdatenregister/.github/workflows/smoke-test-pages.yml) is a fast manual smoke test that skips the large download, generates a tiny fixture dataset, runs the ETL/export/site build, and uploads a build artifact without deploying Pages
+- [pages.yml](.github/workflows/pages.yml) rebuilds the static shell from `site/` on pushes to `release/main` and uploads it as a validation artifact
+- [refresh-pages-data.yml](.github/workflows/refresh-pages-data.yml) is the workflow that deploys the live Pages site: it checks out `release/main`, downloads the latest MaStR ZIP, runs ETL/export/site build, and publishes the complete `dist/` artifact including `dist/data/`
+- [smoke-test-pages.yml](.github/workflows/smoke-test-pages.yml) is a fast manual smoke test that skips the large download, generates a tiny fixture dataset, runs the ETL/export/site build, and uploads a build artifact without deploying Pages
 
 This route does not need Streamlit, DuckDB, or Python on the host. The data is precomputed during export, and the browser filters the GeoJSON client-side.
 The public static site uses approximate coordinates by default to avoid republishing exact points in a clean bulk form.
 The generated `summary.json` also carries metadata for the source export date and the UTC build timestamp so the site can show when the underlying MaStR dump was published and when the static site was rebuilt.
 
 Notes:
+
 - GitHub Actions artifacts are separate from git history; they are not stored "inside" the repository tree.
 - `dist/` is generated output and should not be committed.
 
@@ -177,6 +185,7 @@ docker run --rm -p 8080:80 mastr-bess-static
 Then open `http://localhost:8080`.
 
 The container serves the static `dist/` output with Nginx. It does not run ETL or DuckDB inside the container. The intended flow is:
+
 1. run `uv run etl`
 2. run `uv run export-bess --out-dir dist/data`
 3. run `uv run build-static-site`
@@ -203,6 +212,7 @@ WHERE kk.Name = 'Batterietechnologie';
 ```
 
 Use in a query:
+
 ```sql
 SELECT
     e.EinheitMastrNummer,
@@ -219,6 +229,7 @@ LIMIT 20;
 ### Example queries
 
 **Find a plant by name:**
+
 ```sql
 SELECT EinheitMastrNummer, NameStromerzeugungseinheit, Ort, Nettonennleistung
 FROM EinheitenStromSpeicher
@@ -226,6 +237,7 @@ WHERE NameStromerzeugungseinheit ILIKE '%smareg4%';
 ```
 
 **Large commercial BESS (> 1 MW):**
+
 ```sql
 SELECT
     e.EinheitMastrNummer,
@@ -240,6 +252,7 @@ ORDER BY e.Nettonennleistung DESC;
 ```
 
 **Storage capacity by federal state:**
+
 ```sql
 SELECT
     bl.Wert AS Bundesland,
@@ -253,6 +266,7 @@ ORDER BY GW_Leistung DESC;
 ```
 
 **Find who operates a plant (Netzbetreiber):**
+
 ```sql
 SELECT
     e.EinheitMastrNummer,
@@ -264,6 +278,7 @@ WHERE e.NameStromerzeugungseinheit ILIKE '%smareg4%';
 ```
 
 **Grid connection point for a unit:**
+
 ```sql
 SELECT
     e.EinheitMastrNummer,
@@ -278,6 +293,7 @@ WHERE e.NameStromerzeugungseinheit ILIKE '%smareg4%';
 ```
 
 **EEG subsidy data for a storage unit:**
+
 ```sql
 SELECT
     e.EinheitMastrNummer,
