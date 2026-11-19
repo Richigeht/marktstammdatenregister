@@ -80,9 +80,11 @@ def normalize_records(df: pd.DataFrame, columns: list[str]) -> pd.DataFrame:
 
 
 def build_geojson(df: pd.DataFrame) -> dict:
-    df = df.dropna(subset=["latitude", "longitude"]).copy()
+    df = df.loc[
+        df["latitude"].between(-90, 90) & df["longitude"].between(-180, 180)
+    ].copy()
     features = []
-    for record in df.to_dict(orient="records"):
+    for record in json_records(df):
         lon = float(record.pop("longitude"))
         lat = float(record.pop("latitude"))
         features.append(
@@ -93,6 +95,11 @@ def build_geojson(df: pd.DataFrame) -> dict:
             }
         )
     return {"type": "FeatureCollection", "features": features}
+
+
+def json_records(df: pd.DataFrame) -> list[dict]:
+    """Convert pandas missing and non-finite values to JSON null at the boundary."""
+    return json.loads(df.to_json(orient="records", force_ascii=False, date_format="iso"))
 
 
 def write_summary(
@@ -119,7 +126,7 @@ def write_summary(
             value for value in all_df["operating_status"].dropna().unique() if value
         ),
     }
-    out_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
+    out_path.write_text(json.dumps(summary, ensure_ascii=False, indent=2, allow_nan=False) + "\n", encoding="utf-8")
 
 
 def main():
@@ -166,7 +173,7 @@ def main():
     built_at_utc = datetime.now(timezone.utc).replace(microsecond=0).isoformat().replace("+00:00", "Z")
     full_df = normalize_records(df, FULL_EXPORT_COLUMNS)
     mapped_exact_df = normalize_records(
-        df.dropna(subset=["latitude", "longitude"]).copy(),
+        df.loc[df["latitude"].between(-90, 90) & df["longitude"].between(-180, 180)].copy(),
         WEB_EXPORT_COLUMNS,
     )
     public_df = round_coordinates(mapped_exact_df, args.coordinate_decimals)
@@ -188,12 +195,12 @@ def main():
 
     if "json" in formats:
         json_path = out_dir / "bess.json"
-        json_path.write_text(json.dumps(export_df.to_dict(orient="records"), ensure_ascii=False), encoding="utf-8")
+        json_path.write_text(json.dumps(json_records(export_df), ensure_ascii=False, allow_nan=False), encoding="utf-8")
         print(f"Wrote {json_path}")
 
     if "geojson" in formats:
         geojson_path = out_dir / "bess.geojson"
-        geojson_path.write_text(json.dumps(build_geojson(export_df), ensure_ascii=False), encoding="utf-8")
+        geojson_path.write_text(json.dumps(build_geojson(export_df), ensure_ascii=False, allow_nan=False), encoding="utf-8")
         print(f"Wrote {geojson_path}")
 
     summary_path = out_dir / "summary.json"
