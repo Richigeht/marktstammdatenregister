@@ -10,10 +10,14 @@ __pycache__
 *.duckdb.wal
 *.duckdb.tmp
 .DS_Store
-dist
 site
 src
 Dokumentation MaStR Gesamtdatenexport.zip
 Dokumentation MaStR Gesamtdatenexport/
 Gesamtdatenexport_*/
 Gesamtdatenexport_*.zip
+
+node_modules
+.astro
+.astro-build
+.impeccable

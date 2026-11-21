@@ -1,0 +1,148 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-11-21T17:13:05.474132+00:00",
+  "title": "Design System: BESS Atlas",
+  "extensions": {
+    "shadows": [
+      {
+        "name": "cluster",
+        "value": "0 3px 8px #18352c24",
+        "purpose": "Separate clustered map markers from the base map."
+      }
+    ],
+    "motion": [
+      {
+        "name": "chart-duration",
+        "value": "350ms",
+        "purpose": "ECharts animation; disabled for reduced motion."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "prefers-reduced-motion: reduce",
+        "purpose": "Disable charts, map animation, smooth anchor and selection scrolling, and CSS transitions/animations."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "wide-map",
+        "value": "min-width: 1600px"
+      },
+      {
+        "name": "compact-desktop",
+        "value": "max-width: 1200px"
+      },
+      {
+        "name": "stacked",
+        "value": "max-width: 900px"
+      },
+      {
+        "name": "mobile",
+        "value": "max-width: 600px"
+      }
+    ],
+    "focus": {
+      "value": "3px solid #357b58",
+      "offset": "3px",
+      "selector": ":focus-visible"
+    },
+    "provenance": {
+      "mode": "scan",
+      "sources": [
+        "site/src/pages/index.astro",
+        "site/src/styles/atlas.css",
+        "site/src/scripts/app.js"
+      ],
+      "direction": "Code-led implementation; user approved sensible defaults; no approved visual comp.",
+      "validation": "Direct source extraction; no launcher or detector available to this documentation step."
+    }
+  },
+  "components": [
+    {
+      "name": "Primary button",
+      "kind": "button",
+      "description": "Export filtered CSV control.",
+      "html": "<button class=\"ds-primary\">Export filtered CSV</button>",
+      "css": ".ds-primary{font:600 12px \"Manrope Variable\",sans-serif;border:0;background:var(--ink,#18352c);color:#fff;border-radius:6px;padding:0 16px;min-height:44px;cursor:pointer}.ds-primary:hover{background:var(--green,#17694f)}.ds-primary:focus-visible{outline:3px solid #357b58;outline-offset:3px}.ds-primary:disabled{opacity:.45;cursor:default}",
+      "refersTo": "button-primary"
+    },
+    {
+      "name": "Subtle button",
+      "kind": "button",
+      "description": "Fit results control.",
+      "html": "<button class=\"ds-subtle\">Fit results</button>",
+      "css": ".ds-subtle{font:600 11px \"Manrope Variable\",sans-serif;border:1px solid var(--line,#d7dfd6);background:#fff;color:var(--ink,#18352c);border-radius:6px;padding:0 12px;min-height:40px;cursor:pointer}.ds-subtle:hover{background:#edf6df;border-color:#a4b994}.ds-subtle:focus-visible{outline:3px solid #357b58;outline-offset:3px}.ds-subtle:disabled{opacity:.45;cursor:default}"
+    },
+    {
+      "name": "Text button",
+      "kind": "button",
+      "description": "Reset control.",
+      "html": "<button class=\"ds-text\">Reset</button>",
+      "css": ".ds-text{font:650 12px \"Manrope Variable\",sans-serif;border:0;background:transparent;color:var(--green,#17694f);border-radius:6px;padding:0 10px;min-height:44px;cursor:pointer}.ds-text:hover{background:#edf6df}.ds-text:focus-visible{outline:3px solid #357b58;outline-offset:3px}.ds-text:disabled{opacity:.45;cursor:default}"
+    },
+    {
+      "name": "Search field",
+      "kind": "input",
+      "description": "Visible label and native search input.",
+      "html": "<label class=\"ds-label\">Search plants<input class=\"ds-input\" type=\"search\" placeholder=\"Name, operator, city or MaStR ID\"></label>",
+      "css": ".ds-label{font:600 11px \"Manrope Variable\",sans-serif;color:var(--muted,#53645c)}.ds-input{display:block;width:100%;height:44px;margin-top:8px;padding:0 10px;border:1px solid var(--line,#d7dfd6);border-radius:6px;background:#fff;color:var(--ink,#18352c);font:12px \"Manrope Variable\",sans-serif;caret-color:var(--green,#17694f)}.ds-input::placeholder{color:#64736a;opacity:1}.ds-input:focus-visible{outline:3px solid #357b58;outline-offset:3px}"
+    },
+    {
+      "name": "Status tag",
+      "kind": "chip",
+      "refersTo": "status-tag",
+      "description": "Text-labelled registered status.",
+      "html": "<span class=\"ds-tag\">In operation</span>",
+      "css": ".ds-tag{display:inline-block;font:10px \"Manrope Variable\",sans-serif;background:#edf3e8;color:#285d43;padding:4px 7px;border-radius:4px;white-space:nowrap}"
+    },
+    {
+      "name": "Panel",
+      "kind": "card",
+      "refersTo": "panel",
+      "description": "Flat bordered analytical container.",
+      "html": "<section class=\"ds-panel\"><h2 class=\"ds-heading\">Regional distribution</h2><p class=\"ds-copy\">Top states by matching unit count</p></section>",
+      "css": ".ds-panel{padding:22px 24px 18px;border:1px solid var(--line,#d7dfd6);border-radius:12px;background:var(--surface,#fff)}.ds-heading{margin:0 0 6px;font:650 18px/1.3 \"Manrope Variable\",sans-serif;letter-spacing:-.025em;color:var(--ink,#18352c)}.ds-copy{margin:0;font:11px/1.65 \"Manrope Variable\",sans-serif;color:var(--muted,#53645c)}"
+    },
+    {
+      "name": "Header navigation",
+      "kind": "nav",
+      "description": "Anchor navigation on a dark header.",
+      "html": "<nav class=\"ds-nav\" aria-label=\"Main\"><a href=\"#explorer\">Explorer</a><a href=\"#plants\">Plants</a><a href=\"#about\">About the data</a></nav>",
+      "css": ".ds-nav{display:flex;gap:30px;background:var(--ink,#18352c);padding:0 24px}.ds-nav a{font:13px \"Manrope Variable\",sans-serif;color:#d7e2d9;text-decoration:none;padding:28px 0}.ds-nav a:hover{color:var(--lime,#c4f16b)}.ds-nav a:focus-visible{outline:3px solid #357b58;outline-offset:3px}"
+    },
+    {
+      "name": "Cluster marker",
+      "kind": "custom",
+      "description": "44px clustered unit count.",
+      "html": "<button class=\"ds-cluster\" aria-label=\"42 storage units; zoom in\">42</button>",
+      "css": ".ds-cluster{width:44px;height:44px;display:flex;align-items:center;justify-content:center;border:3px solid #c4f16b;border-radius:50%;background:var(--green,#17694f);color:#fff;font:650 11px \"Manrope Variable\",sans-serif;font-variant-numeric:tabular-nums;box-shadow:0 3px 8px #18352c24;cursor:pointer}.ds-cluster:hover{background:#18352c}.ds-cluster:focus-visible{outline:3px solid #357b58;outline-offset:3px}"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Energy Research Workspace",
+    "overview": "Light mineral surfaces, forest ink and compact analytical typography support coordinated map, chart and registry exploration. The direction describes implemented code, not an approved visual comp.",
+    "keyCharacteristics": [
+      "Visible provenance",
+      "Tabular measurements",
+      "Flat bordered panels",
+      "Shared filters",
+      "Accessible text alternatives"
+    ],
+    "rules": [
+      {
+        "name": "Flat analytical surfaces",
+        "body": "Use quiet rules and tonal surfaces; reserve the authored shadow for map clusters.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do preserve visible labels and focus.",
+      "Do distinguish mapped units, registry scope and unknown measurements.",
+      "Do keep chart text alternatives."
+    ],
+    "donts": [
+      "Don't replace unknown values with zero.",
+      "Don't rely on color or map interaction alone.",
+      "Don't imply an approved visual comp exists."
+    ]
+  }
+}

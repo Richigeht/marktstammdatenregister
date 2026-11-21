@@ -216,3 +216,13 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Astro / frontend
+node_modules/
+.astro/
+.astro-build/
+playwright-report/
+test-results/
+.impeccable/review/
+.astro-stage-*/
+site/public/data/
