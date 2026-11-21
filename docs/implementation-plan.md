@@ -21,3 +21,5 @@ Boundary source: Germany feature (`ADM0_A3=DEU`) extracted without simplifying g
 - `npm audit --omit=dev`: zero known vulnerabilities in the production dependency tree at verification time.
 - Fixed `.dockerignore` excluding `dist/`, which previously prevented Docker from copying the built app. Container build succeeded. Runtime test exposed restrictive source-directory permissions (HTTP 403); the image now grants nginx workers read/traverse access to the copied static files.
 - Production data refresh started from main (run 44928235554) because prior deployed data was built from pre-fix commit ad97c8c. New Astro UI is a separate branch pending integration.
+
+Hosted validation found newly merged main dependency PRs had produced invalid TOML in uv.lock. Regenerated from the last valid lock with the intended Pillow 13 constraint. The resolver selected Streamlit 1.67 and removed its now-unused GitPython/Tornado dependencies rather than retaining obsolete transitive packages. All workflows now explicitly sync Python 3.12, matching setup-python rather than implicitly following the separate 3.14 local pin. Python tests pass on 3.12 after the repair.

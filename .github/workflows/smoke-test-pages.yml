@@ -31,7 +31,7 @@ jobs:
         uses: astral-sh/setup-uv@v5
 
       - name: Install dependencies
-        run: uv sync --locked
+        run: uv sync --locked --python 3.12
 
       - name: Build smoke-test fixture
         id: smoke
