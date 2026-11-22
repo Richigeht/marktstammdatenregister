@@ -1,0 +1,358 @@
+---
+import "@fontsource-variable/manrope";
+import "../styles/atlas.css";
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="Explore German battery storage registrations from MaStR. Compare power, capacity and operating status on an interactive map."
+    />
+    <meta name="theme-color" content="#18352c" />
+    <title>BESS Atlas — Germany’s battery storage registry</title>
+  </head>
+  <body>
+    <a class="skip" href="#main">
+      Skip to explorer
+    </a>
+    <header class="topbar">
+      <a class="brand" href="./" aria-label="BESS Atlas home">
+        <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true">
+          <rect x="2" y="5" width="23" height="20" rx="4" fill="currentColor" />
+          <path d="M27 11v8" stroke="currentColor" stroke-width="3" />
+          <path d="m16 9-6 7h5l-1 5 6-8h-5z" fill="#c4f16b" />
+        </svg>
+        <span>
+          BESS<span class="brand-light">Atlas</span>
+        </span>
+      </a>
+      <nav aria-label="Main">
+        <a href="#explorer">Explorer</a>
+        <a href="#plants">Plants</a>
+        <a href="#about">About the data</a>
+      </nav>
+      <span class="country">
+        <span class="country-dot"></span>Germany
+      </span>
+    </header>
+    <main id="main" class="layout">
+      <section class="intro" id="explorer">
+        <div>
+          <h1>Battery storage, in perspective.</h1>
+          <p>
+            Explore Germany’s registered battery storage units. Find a plant,
+            compare regions, inspect power and capacity.
+          </p>
+        </div>
+        <div class="provenance">
+          <span class="source-badge">MaStR · Bundesnetzagentur</span>
+          <p id="dataset-meta">Loading dataset information…</p>
+        </div>
+      </section>
+      <div
+        id="status-banner"
+        class="notice"
+        role="status"
+        aria-live="polite"
+        hidden
+      >
+        <span id="status-message"></span>
+        <button id="retry" type="button" hidden>
+          Try again
+        </button>
+      </div>
+      <form id="filters" class="filters" aria-label="Filter plants">
+        <label class="search-field">
+          Search plants
+          <input
+            name="search"
+            id="search"
+            type="search"
+            placeholder="Name, operator, city or MaStR ID"
+            autocomplete="off"
+          />
+        </label>
+        <label>
+          Federal state
+          <select name="state" id="state-filter">
+            <option value="">All states</option>
+          </select>
+        </label>
+        <label>
+          Operating status
+          <select name="status" id="status-filter">
+            <option value="">All statuses</option>
+          </select>
+        </label>
+        <label>
+          Technology
+          <select name="technology" id="technology-filter">
+            <option value="">All technologies</option>
+          </select>
+        </label>
+        <label>
+          Min. power <span class="unit">MW</span>
+          <input
+            name="minPower"
+            id="min-power"
+            type="number"
+            min="0"
+            step="any"
+            placeholder="Any"
+          />
+        </label>
+        <label>
+          Min. capacity <span class="unit">MWh</span>
+          <input
+            name="minCapacity"
+            id="min-capacity"
+            type="number"
+            min="0"
+            step="any"
+            placeholder="Any"
+          />
+        </label>
+        <button type="reset" class="text-button">
+          Reset
+        </button>
+      </form>
+      <section
+        class="metrics"
+        aria-label="Filtered dataset metrics"
+        aria-live="polite"
+      >
+        <div>
+          <span>Matching units</span>
+          <strong id="plants-count">—</strong>
+          <small id="scope-label">Loading public mapped records</small>
+        </div>
+        <div>
+          <span>Net power</span>
+          <strong id="power-sum">—</strong>
+          <small id="power-note">Known values only</small>
+        </div>
+        <div>
+          <span>Storage capacity</span>
+          <strong id="capacity-sum">—</strong>
+          <small id="capacity-note">Known values only</small>
+        </div>
+        <div class="scope-metric">
+          <span>Map precision</span>
+          <strong>Approximate</strong>
+          <small id="precision-note">Public locations are rounded</small>
+        </div>
+      </section>
+      <section class="overview" aria-label="Map and insights">
+        <div class="map-panel panel">
+          <div class="panel-title">
+            <div>
+              <h2>The storage landscape</h2>
+              <p>
+                Clusters show unit counts. Select a point to inspect a plant.
+              </p>
+            </div>
+            <button id="fit-map" type="button" class="subtle-button">
+              Fit results
+            </button>
+          </div>
+          <div class="map-container">
+            <div
+              id="map"
+              aria-label="Map of German battery storage plants"
+            ></div>
+            <p id="map-alert" class="map-alert" role="status" hidden>
+              Base map unavailable. Plant markers and the registry remain
+              usable.
+            </p>
+          </div>
+          <div class="map-caption">
+            <span>
+              <i></i>Battery storage units
+            </span>
+            <span>Approximate locations · not for navigation</span>
+          </div>
+        </div>
+        <aside class="insights panel" aria-label="Dataset insights">
+          <div class="panel-title">
+            <div>
+              <h2>Regional distribution</h2>
+              <p>Top states by matching unit count · select to filter</p>
+            </div>
+          </div>
+          <div
+            id="state-chart"
+            class="state-chart"
+            role="img"
+            aria-label="Unit counts by federal state"
+          ></div>
+          <details class="chart-alternative">
+            <summary>View state counts as text</summary>
+            <ul id="state-summary"></ul>
+          </details>
+          <div class="status-heading">
+            <h2>Operating status</h2>
+            <p>Matching units by registered status</p>
+          </div>
+          <div
+            id="status-chart"
+            class="status-chart"
+            role="img"
+            aria-label="Unit counts by operating status"
+          ></div>
+          <ul id="status-summary" class="status-legend"></ul>
+        </aside>
+      </section>
+      <section class="registry" id="plants" aria-label="Plant registry">
+        <div class="registry-title">
+          <div>
+            <h2>Explore the registry</h2>
+            <p id="table-count" aria-live="polite">
+              Waiting for plant data…
+            </p>
+          </div>
+          <button id="download" type="button" class="primary-button" disabled>
+            Export filtered CSV <span aria-hidden="true">↓</span>
+          </button>
+        </div>
+        <div class="registry-grid">
+          <div class="panel table-panel">
+            <div
+              class="table-wrap"
+              tabindex="0"
+              aria-label="Scrollable plants table"
+            >
+              <table>
+                <caption class="sr-only">
+                  Matching battery storage units. Select a plant name to view
+                  its details.
+                </caption>
+                <thead>
+                  <tr>
+                    <th scope="col" aria-sort="none">
+                      <button data-sort="plant_name">
+                        Plant <span aria-hidden="true">↕</span>
+                      </button>
+                    </th>
+                    <th scope="col">State / city</th>
+                    <th scope="col" class="numeric" aria-sort="descending">
+                      <button data-sort="net_power_mw">
+                        Net MW <span aria-hidden="true">↓</span>
+                      </button>
+                    </th>
+                    <th scope="col" class="numeric" aria-sort="none">
+                      <button data-sort="usable_capacity_mwh">
+                        MWh <span aria-hidden="true">↕</span>
+                      </button>
+                    </th>
+                    <th scope="col">Status</th>
+                  </tr>
+                </thead>
+                <tbody id="table-body">
+                  <tr>
+                    <td colspan="5" class="table-empty">
+                      Loading registered storage units…
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div class="pagination">
+              <span id="page-label">—</span>
+              <div>
+                <button id="previous" class="subtle-button" disabled>
+                  Previous
+                </button>
+                <button id="next" class="subtle-button" disabled>
+                  Next
+                </button>
+              </div>
+            </div>
+          </div>
+          <aside
+            class="panel details-panel"
+            aria-label="Selected plant details"
+          >
+            <div class="panel-title">
+              <h2>Plant details</h2>
+              <button
+                id="clear-selection"
+                class="text-button"
+                type="button"
+                hidden
+              >
+                Clear
+              </button>
+            </div>
+            <div id="selection" class="selection">
+              <div class="empty-selection">
+                <svg
+                  viewBox="0 0 48 48"
+                  width="48"
+                  height="48"
+                  aria-hidden="true"
+                >
+                  <circle
+                    cx="24"
+                    cy="20"
+                    r="10"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                  />
+                  <path
+                    d="m17 28 7 12 7-12M24 15v10m-5-5h10"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="1.5"
+                  />
+                </svg>
+                <h3>A closer look.</h3>
+                <p>
+                  Select a map point or plant name to see its registration,
+                  operator and specifications.
+                </p>
+              </div>
+            </div>
+          </aside>
+        </div>
+      </section>
+      <footer id="about">
+        <div>
+          <h2>A view of the registry, not the whole market.</h2>
+          <p>
+            Source:{" "}
+            <a
+              href="https://www.marktstammdatenregister.de/MaStR/Datendownload"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Marktstammdatenregister bulk export
+            </a>{" "}
+            from the Bundesnetzagentur. This public explorer includes records
+            with valid coordinates. Registry units can share a physical site;
+            counts do not imply distinct projects. Missing measurements appear
+            as “—” and are excluded from totals.
+          </p>
+        </div>
+        <div>
+          <h3>Know the limits</h3>
+          <p>
+            Locations are rounded for this public view. Registration status and
+            dates may differ from actual operation. All charts, totals and
+            downloads follow the active filters.
+          </p>
+          <a href="https://github.com/Richigeht/marktstammdatenregister">
+            Source code & documentation <span aria-hidden="true">↗</span>
+          </a>
+        </div>
+      </footer>
+    </main>
+    <script>
+      import "../scripts/app.js";
+    </script>
+  </body>
+</html>

@@ -29,6 +29,8 @@ Join to `Katalogwerte` to resolve them to text — see [Resolving enum codes](#r
 
 ## Requirements
 
+- Node.js 24 LTS and npm (Astro frontend builds)
+
 - [uv](https://docs.astral.sh/uv/) — `brew install uv`
 - [DuckDB CLI](https://duckdb.org/docs/installation) — `brew install duckdb`
 
@@ -43,6 +45,7 @@ cd marktstammdatenregister
 # Unzip into the project directory — folder name: Gesamtdatenexport_YYYYMMDD_XX.X/
 
 uv sync
+npm ci
 ```
 
 ## Import data
@@ -138,11 +141,16 @@ For a static website, run ETL and export in a build step somewhere else, then pu
 
 ### Static site for GitHub Pages
 
-The repo includes a static frontend source in [site/index.html](site/index.html). The generated publish output lives in `dist/` and reads exported data from `dist/data/`.
+The public frontend is built with **Astro**, **Apache ECharts**, and **Leaflet** with Supercluster. Its route lives in [site/src/pages/index.astro](site/src/pages/index.astro). Dependencies and fonts are bundled locally; OpenStreetMap serves map tiles. A bundled public-domain [Natural Earth](https://www.naturalearthdata.com/about/terms-of-use/) Germany boundary provides geographic context if external tiles fail. The Python ETL and optional Streamlit app remain available.
+
+The dashboard shares search, federal state, status, technology, minimum power and capacity filters across the map, charts, paginated/sortable table, totals and CSV download. State bars filter the explorer. Filter URLs can be bookmarked. Unknown measurements remain unknown and are excluded from totals. CSV export neutralizes spreadsheet formulas. Map coordinates remain approximate.
+
+Generated output lives in `dist/` and reads exported data from `dist/data/`. `uv run build-static-site` stages an Astro production build before copying it into `dist/`, preserving existing data. Do **not** build Astro directly into `dist/`: Astro clears its output directory.
 
 Build the static payload like this:
 
 ```bash
+npm ci
 uv run etl
 uv run export-bess --out-dir dist/data
 uv run build-static-site
@@ -160,8 +168,8 @@ To host on GitHub Pages:
 
 - commit `site/` and the workflow files
 - enable GitHub Pages in repo settings
-- [pages.yml](.github/workflows/pages.yml) rebuilds the static shell from `site/` on pushes to `release/main` and uploads it as a validation artifact
-- [refresh-pages-data.yml](.github/workflows/refresh-pages-data.yml) is the workflow that deploys the live Pages site: it checks out `release/main`, downloads the latest MaStR ZIP, runs ETL/export/site build, and publishes the complete `dist/` artifact including `dist/data/`
+- [pages.yml](.github/workflows/pages.yml) rebuilds the static shell from `site/` on pull requests and pushes to `main` and uploads it as a validation artifact
+- [refresh-pages-data.yml](.github/workflows/refresh-pages-data.yml) is the workflow that deploys the live Pages site: it checks out the default branch, downloads the latest MaStR ZIP, runs ETL/export/site build, and publishes the complete `dist/` artifact including `dist/data/`
 - [smoke-test-pages.yml](.github/workflows/smoke-test-pages.yml) is a fast manual smoke test that skips the large download, generates a tiny fixture dataset, runs the ETL/export/site build, and uploads a build artifact without deploying Pages
 
 This route does not need Streamlit, DuckDB, or Python on the host. The data is precomputed during export, and the browser filters the GeoJSON client-side.
@@ -307,6 +315,29 @@ LEFT JOIN AnlagenEegSpeicher  eeg  ON e.EegMaStRNummer  = eeg.EegMaStRNummer
 LEFT JOIN AnlagenStromSpeicher stor ON e.SpeMastrNummer  = stor.MaStRNummer
 WHERE e.NameStromerzeugungseinheit ILIKE '%smareg4%';
 ```
+
+## Frontend development and verification
+
+```bash
+npm ci
+# Build a publishable shell without deleting dist/data
+uv run build-static-site
+python3 -m http.server 8000 -d dist
+
+# Pure data behavior + Python export/build tests
+npm test
+uv run python -m unittest discover -s tests -v
+
+# Chromium browser interactions at desktop and mobile sizes
+npx playwright install chromium
+PLAYWRIGHT_CHROMIUM_EXECUTABLE=/path/to/chromium npm run test:browser
+```
+
+For hot reload, put the exported data in `site/public/data/` (ignored by git), then run `npm run dev`. Never commit public or internal exports as source code. `npm run build` alone writes the shell to `.astro-build/`; use the Python build command for a complete publish directory with existing data.
+
+CI pins Node 24, installs with `npm ci`, and validates the frontend on pull requests. Refresh Pages Data still owns live deployment, rebuilding the real source export before publishing. The manual smoke workflow uses a tiny XML fixture and does not deploy. Publishing the shell alone does not refresh data.
+
+Current dependency research and migration decisions are in [docs/implementation-plan.md](docs/implementation-plan.md). Source documentation: [Astro GitHub Pages deployment](https://docs.astro.build/en/guides/deploy/github/) and [ECharts imports](https://echarts.apache.org/handbook/en/basics/import/).
 
 ## Data source
 
